@@ -1,0 +1,193 @@
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Hashtable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+/**
+ *
+ @author najlaalhajri
+ */
+public class Server {
+
+    public static void main(String[] args) throws IOException {
+
+        ServerSocket servSocket = new ServerSocket(9999);//Server Socket Listeningg for cliwnt requests
+
+        while (true) {
+            System.out.println("Waiting for clients");
+            Socket sock = servSocket.accept(); //Accept new client request and open socket for client..
+
+            //Call Thread               
+            new ServerThread(sock).start();
+
+        }//end while loop
+
+    }//end main
+
+}//end Server Class
+
+/////////////////////////////////////////
+class ServerThread extends Thread {
+
+    Socket socket;
+    
+  private static final String encryptionKey = "ABCZDEFGHIJSLMNO";//128-bit
+   private static final String aesEncryptionAlgorithem = "AES";
+    private static final String characterEncoding = "UTF-8";
+    private static final String cipherTransformation = "AES/CBC/PKCS5PADDING";
+    
+    
+    
+    static Hashtable<String,String> car =new Hashtable<>();
+     
+    
+
+    public ServerThread(Socket sock) {
+        this.socket = sock;
+       car.put("BMW","Manufacturer Country: Germany \\n Year:2022 \\n type:7series\\n  price:150k");
+       car.put("Toyota"," Manufacturer Country: japan\nYear:2021 \n type: land cruiser \n price:90k");
+       car.put("Audi", "Manufacturer Country: Germany \n  Year:2020 \n type:Q5 \n  price:100k");
+       car.put("Genesis", "Manufacturer Country: South Korea \n Year:2023 \n type:gv80 \n  price:120k");
+       car.put("Porsche","Manufacturer Country: Germany \n Year:2019 \n type:911 \n  price:300k");
+       car.put("Rolls Royce", "Manufacturer Country: England \n Year:2023 \n type:Phantom \n  price:450k");
+       
+    }//end constructor
+
+    public static String getInfo(String Req) {
+
+       switch(Req) {
+	
+	case"BMW":
+		return "Manufacturer Country: Germany \n Year:2022 \n type:7series\n  price:150k";
+		
+	
+	case"Toyota":
+		return"Manufacturer Country: japan\nYear:2021 \n type: land cruiser price:90k";
+		
+		
+	case"Audi":
+		
+		return"Manufacturer Country: Germany \n Year:2020 \n type:Q5 \n  price:100k";
+	
+		
+	case"Genesis":
+		return "Manufacturer Country: South Korea \n Year:2023 \n type:gv80 \n  price:120k";
+	
+	
+	default:
+		return	"please select one of the available items";
+	
+	
+	
+	}
+
+
+    }//end get price..
+
+    @Override
+    public void run() {
+
+        try {
+
+            ///Code for the server operations
+            System.out.println("Client Connected !");
+            InputStream in = socket.getInputStream();
+            OutputStream out = socket.getOutputStream();
+
+            byte[] buffer = new byte[1024];
+
+            //Read encrypted Data from client over input stream..
+            in.read(buffer);
+
+            String request = decrypt(new String(buffer).trim());//decrypt message request from client
+            System.out.println("received from Client: " + request);
+
+            String result;//send encrypted result..
+            result = encrypt(getInfo(request));
+
+            //Send message to client from server
+            out.write(result.getBytes());
+
+            //Close Soclet with client..
+            socket.close();
+        }//end try
+        catch (IOException ex) {
+
+            System.err.println("I/O Ecxception..");
+        }//end catch
+
+    } //end run
+    public static String GetResult(String req){
+        String result="";
+       if(car.containsKey(req))
+               {
+        result=car.get(req);
+}
+    
+    return result;
+    }
+   
+
+    public static String encrypt(String plainText) {
+        String encryptedText = "";
+        try {
+            Cipher cipher = Cipher.getInstance(cipherTransformation);
+            byte[] key = encryptionKey.getBytes(characterEncoding);
+            SecretKeySpec secretKey = new SecretKeySpec(key, aesEncryptionAlgorithem);
+            IvParameterSpec ivparameterspec = new IvParameterSpec(key);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivparameterspec);
+            byte[] cipherText = cipher.doFinal(plainText.getBytes("UTF8"));
+            
+            
+            Base64.Encoder encoder = Base64.getEncoder();
+            encryptedText = encoder.encodeToString(cipherText);
+
+        } catch (Exception E) {
+            System.err.println("Encrypt Exception : " + E.getMessage());
+        }
+        return encryptedText;
+    }
+    
+    
+    
+        /**
+     * Method For Get encryptedText and Decrypted provided String
+     *
+     * @param encryptedText
+     * @return decryptedText
+     */
+    public static String decrypt(String encryptedText) {
+        String decryptedText = "";
+        try {
+            Cipher cipher = Cipher.getInstance(cipherTransformation);
+            byte[] key = encryptionKey.getBytes(characterEncoding);
+            SecretKeySpec secretKey = new SecretKeySpec(key, aesEncryptionAlgorithem);
+            IvParameterSpec ivparameterspec = new IvParameterSpec(key);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivparameterspec);
+            Base64.Decoder decoder = Base64.getDecoder();
+            byte[] cipherText = decoder.decode(encryptedText.getBytes("UTF8"));
+            decryptedText = new String(cipher.doFinal(cipherText), "UTF-8");
+
+        } catch (Exception E) {
+            System.err.println("decrypt Exception : " + E.getMessage());
+        }
+        return decryptedText;
+    }
+
+   
+}
